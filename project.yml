@@ -1,0 +1,47 @@
+name: FloatTestShell
+options:
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: '16.0'
+  defaultConfig: Release
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    IPHONEOS_DEPLOYMENT_TARGET: '16.0'
+    TARGETED_DEVICE_FAMILY: '1'
+    SUPPORTS_MACCATALYST: NO
+configs:
+  Debug: debug
+  Release: release
+targets:
+  FloatTestShell:
+    type: application
+    platform: iOS
+    deploymentTarget: '16.0'
+    sources:
+      - path: Sources
+      - path: Resources/Assets.xcassets
+    info:
+      path: Generated/FloatTestShell-Info.plist
+      properties:
+        CFBundleDisplayName: Float Test
+        CFBundleName: FloatTestShell
+        CFBundleShortVersionString: '0.1.0'
+        CFBundleVersion: '1'
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+        NSCameraUsageDescription: '仅在 Float 网站请求拍摄照片或视频时使用相机。'
+        NSMicrophoneUsageDescription: '仅在 Float 网站请求录音或通话时使用麦克风。'
+        NSPhotoLibraryUsageDescription: '仅在选择上传已有照片时访问照片。'
+        NSPhotoLibraryAddUsageDescription: '仅在用户明确保存照片时写入相册。'
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: chat.auren.float.testshell
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_EMIT_LOC_STRINGS: YES
+    scheme:
+      gatherCoverageData: false

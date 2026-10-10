@@ -1,0 +1,9 @@
+.DS_Store
+DerivedData/
+build/
+dist/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+FloatTestShell.xcodeproj/
+Generated/
+*.ipa

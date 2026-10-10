@@ -1,0 +1,56 @@
+name: Build iOS test IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unsigned-ipa:
+    name: Build unsigned iPhone app (macOS)
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - name: Check out test shell (not the Float app repository)
+        uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate --spec project.yml
+      - name: Build unsigned device application
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project FloatTestShell.xcodeproj \
+            -scheme FloatTestShell \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/FloatDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/FloatDerivedData/Build/Products/Release-iphoneos/FloatTestShell.app"
+          test -d "$APP"
+          test -f "$APP/Info.plist"
+          EXE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+          test -f "$APP/$EXE"
+          mkdir -p "$RUNNER_TEMP/FloatIPABundle/Payload" dist
+          cp -R "$APP" "$RUNNER_TEMP/FloatIPABundle/Payload/"
+          (cd "$RUNNER_TEMP/FloatIPABundle" && /usr/bin/zip -qr "$GITHUB_WORKSPACE/dist/FloatTestShell-unsigned.ipa" Payload)
+          /usr/bin/unzip -t dist/FloatTestShell-unsigned.ipa | tail -n 2
+          echo 'Unsigned IPA created. It is NOT installed or signed and requires a separate signing/sideloading step.'
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FloatTestShell-unsigned-ipa
+          path: dist/FloatTestShell-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7
