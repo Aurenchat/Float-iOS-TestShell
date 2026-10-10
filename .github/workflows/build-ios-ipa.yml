@@ -11,11 +11,32 @@ jobs:
     name: Build unsigned iPhone app (macOS)
     runs-on: macos-15
     timeout-minutes: 35
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
       - name: Check out test shell (not the Float app repository)
         uses: actions/checkout@v4
-      - name: Show Xcode version
-        run: xcodebuild -version
+      - name: Verify Xcode 26.3 and iOS 26 SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR"
+          if [[ ! -d "$DEVELOPER_DIR" ]]; then
+            echo '::error::Required Xcode 26.3 is missing; refusing to use another Xcode.'
+            exit 1
+          fi
+          XCODE_VERSION=$(xcodebuild -version)
+          printf '%s\n' "$XCODE_VERSION"
+          if [[ "$(printf '%s\n' "$XCODE_VERSION" | head -n 1)" != 'Xcode 26.3' ]]; then
+            echo '::error::Expected Xcode 26.3.'
+            exit 1
+          fi
+          SDK_VERSION=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iPhoneOS SDK=$SDK_VERSION"
+          if [[ "$SDK_VERSION" != 26.* ]]; then
+            echo '::error::Expected an iOS 26 SDK.'
+            exit 1
+          fi
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate Xcode project

@@ -24,10 +24,10 @@ targets:
     info:
       path: Generated/FloatTestShell-Info.plist
       properties:
-        CFBundleDisplayName: Float Test
+        CFBundleDisplayName: Float
         CFBundleName: FloatTestShell
-        CFBundleShortVersionString: '0.1.0'
-        CFBundleVersion: '1'
+        CFBundleShortVersionString: '0.1.1'
+        CFBundleVersion: '2'
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
