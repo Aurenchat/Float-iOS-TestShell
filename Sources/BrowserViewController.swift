@@ -10,6 +10,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     private var browser: WKWebView!
     private var recoveryView: UIView?
     private var downloadDestinations: [ObjectIdentifier: URL] = [:]
+    // Owns exactly one true WKWebView popup for hydrated KV cache handoff.
+    private lazy var kvRescuePopup = KvRescuePopup(host: self)
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -64,6 +66,10 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     }
 
     private func confirmReload() {
+        guard !kvRescuePopup.isOpen else {
+            presentNotice(title: "救援期间不能刷新", message: "请先在 KV 救援窗口保存并验证分卷，再关闭救援窗口。刷新会丢失未保存的内存快照。")
+            return
+        }
         let alert = UIAlertController(title: "刷新 Float？", message: "刷新会中断当前正在进行的 AI 生成。请确认当前没有未完成的回复。", preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "刷新", style: .destructive) { [weak self] _ in
@@ -192,6 +198,12 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
 
         // Only constrain top-level navigation, not fetch/image/audio/API subresources.
         if navigationAction.targetFrame == nil {
+            // A dedicated popup must be allowed through to WKUIDelegate.
+            // Loading it in the opener destroys the hydrated cache.
+            if KvRescuePopup.isRequest(navigationAction, from: webView, main: browser) {
+                decisionHandler(.allow)
+                return
+            }
             if isFloatSite(url) {
                 webView.load(navigationAction.request)
             } else {
@@ -231,18 +243,26 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        hideRecovery()
+        if webView === browser { hideRecovery() }
         NativeDiagnostics.shared.record("navigation_finished", detail: webView.url?.host)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         // -999 = cancelled navigation, e.g. a popup being handled externally.
         if (error as NSError).code == NSURLErrorCancelled { return }
+        if kvRescuePopup.owns(webView) {
+            kvRescuePopup.reportFailure(error)
+            return
+        }
         NativeDiagnostics.shared.record("navigation_failed", detail: "code:\((error as NSError).code)")
         showRecovery(title: "Float 加载失败", detail: "未修改或清除本地数据。请检查网络，准备好后手动重试。")
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        if kvRescuePopup.owns(webView) {
+            kvRescuePopup.reportProcessTermination()
+            return
+        }
         // This callback proves WebContent was terminated, but NOT why (OOM/Jetsam unknown).
         NativeDiagnostics.shared.record("web_content_process_terminated")
         showRecovery(title: "Float 网页进程已结束", detail: "已记录原生进程事件。不会自动刷新，以免中断尚未保存的操作。你可以先导出诊断，再手动重新加载。")
@@ -252,11 +272,17 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if KvRescuePopup.isRequest(navigationAction, from: webView, main: browser) {
+            return kvRescuePopup.open(configuration: configuration)
+        }
         if let url = navigationAction.request.url {
             if isFloatSite(url) { webView.load(navigationAction.request) }
             else { openExternalIfSafe(url) }
         }
         return nil
+    }
+    func webViewDidClose(_ webView: WKWebView) {
+        _ = kvRescuePopup.dismissIfOwned(webView)
     }
     // Do not auto-grant microphone/camera: WKWebView's default behavior prompts.
 
